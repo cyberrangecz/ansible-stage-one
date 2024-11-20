@@ -95,9 +95,33 @@
             jump: DROP
       loop: '{{ private_ip_address_range }}'
 
+- name: Set IPV4 forwarding for MAN
+  hosts: man
+  strategy: free
+  gather_facts: yes
+  become: yes
+  become_user: root
+
+  tasks:
+    - name: set ip forward
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+
+- name: Set routes to host networks for MAN
+  hosts: man
+  strategy: free
+  gather_facts: yes
+  become: yes
+  become_user: root
+
+  tasks:
+    - name: Create route for host networks
+      shell: "ip route add {{ item.net }}/{{ item.mask }} via {{ item.gw }}"
+      loop: "{{ interfaces[0].routes }}"
+
 - name: Sandbox networking
   hosts:
-  - management
   - routers
   strategy: free
   gather_facts: yes
