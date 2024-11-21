@@ -7,3 +7,8 @@
       retries: 10
       delay: 5
       until: result is not failed
+
+    - name: Install netaddr on controller
+      pip:
+        name: netaddr
+        executable: pip3
