@@ -83,44 +83,44 @@
       value: '{% if ip_forward %}1{% else %}0{% endif %}'
     when: ip_forward is defined
 
-- name: Sandbox networking
-  hosts:
-  - ssh_nodes
-  strategy: free
-  gather_facts: yes
-  become: yes
-  become_user: root
-  tasks:
-    - name: Create Netplan configuration file
-      copy:
-        content: |
-          #jinja2: trim_blocks: True, lstrip_blocks: True
-          network:
-            version: 2
-            ethernets:
-              {% set priority_interface_index = 1 %}
-              {% set sorted_interfaces = ansible_interfaces | reject('equalto', 'lo') | sort %}
-              {% for interface in sorted_interfaces %}
-              {{ interface }}:
-                dhcp4: true
-                dhcp4-overrides:
-                  route-metric: {{ 200 if loop.index0 != priority_interface_index else 100 }}
-                dhcp6: false
-                {% if loop.index0 == priority_interface_index and ansible_default_ipv4.gateway is defined %}
-                routes:
-                  - to: 0.0.0.0/0
-                    via: {{ ansible_default_ipv4.gateway }}
-                {% endif %}
-              {% endfor %}
-        dest: /etc/netplan/50-cloud-init.yaml
-        owner: root
-        group: root
-        mode: '0600'
-      when: ansible_distribution == 'Ubuntu' or (ansible_distribution == 'Debian' and ansible_distribution_version is version('12', '>='))
-
-    - name: Apply Netplan
-      shell: netplan apply
-      when: ansible_distribution == 'Ubuntu' or (ansible_distribution == 'Debian' and ansible_distribution_version is version('12', '>='))
+# - name: Sandbox networking
+#   hosts:
+#   - ssh_nodes
+#   strategy: free
+#   gather_facts: yes
+#   become: yes
+#   become_user: root
+#   tasks:
+#     - name: Create Netplan configuration file
+#       copy:
+#         content: |
+#           #jinja2: trim_blocks: True, lstrip_blocks: True
+#           network:
+#             version: 2
+#             ethernets:
+#               {% set priority_interface_index = 1 %}
+#               {% set sorted_interfaces = ansible_interfaces | reject('equalto', 'lo') | sort %}
+#               {% for interface in sorted_interfaces %}
+#               {{ interface }}:
+#                 dhcp4: true
+#                 dhcp4-overrides:
+#                   route-metric: {{ 200 if loop.index0 != priority_interface_index else 100 }}
+#                 dhcp6: false
+#                 {% if loop.index0 == priority_interface_index and ansible_default_ipv4.gateway is defined %}
+#                 routes:
+#                   - to: 0.0.0.0/0
+#                     via: {{ ansible_default_ipv4.gateway }}
+#                 {% endif %}
+#               {% endfor %}
+#         dest: /etc/netplan/50-cloud-init.yaml
+#         owner: root
+#         group: root
+#         mode: '0600'
+#       when: ansible_distribution == 'Ubuntu' or (ansible_distribution == 'Debian' and ansible_distribution_version is version('12', '>='))
+# 
+#     - name: Apply Netplan
+#       shell: netplan apply
+#       when: ansible_distribution == 'Ubuntu' or (ansible_distribution == 'Debian' and ansible_distribution_version is version('12', '>='))
 
 - name: Install Chrony on MAN node
   hosts: man
