@@ -36,6 +36,7 @@
 
   roles:
   - role: interface
+    interface_mtu: 1500
     interface_interfaces: '
     {%- import "roles/common/templates/network.j2" as network with context -%}
     {%- set variables = namespace(
