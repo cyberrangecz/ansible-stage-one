@@ -29,7 +29,7 @@
 - name: k3s
   src: https://github.com/cyberrangecz/ansible-role-k3s.git
   scm: git
-  version: v1.0.0
+  version: v1.1.0
 - name: man-logging-forward
   src: https://github.com/cyberrangecz/ansible-role-man-logging-forward.git
   scm: git
