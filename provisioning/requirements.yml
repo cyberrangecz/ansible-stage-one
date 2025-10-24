@@ -14,10 +14,6 @@
   src: https://github.com/cyberrangecz/ansible-role-docker-compose.git
   scm: git
   version: v1.0.0
-- name: guacamole
-  src: https://github.com/cyberrangecz/ansible-role-guacamole.git
-  scm: git
-  version: v1.0.0
 - name: interface
   src: https://github.com/cyberrangecz/ansible-role-interface.git
   scm: git
