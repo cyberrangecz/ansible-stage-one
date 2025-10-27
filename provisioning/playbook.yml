@@ -25,6 +25,9 @@
       resolved_upstream_dns: "{{ resolved_status.stdout | regex_findall('DNS Servers: (.*)') | map('trim') | join(' ') | split() }}"
     when: resolved_status.rc == 0
 
+- name: Gather facts from proxy-jump
+  hosts: proxy-jump
+
 - name: Sandbox networking
   hosts:
   - management
@@ -36,6 +39,7 @@
 
   roles:
   - role: interface
+    interface_mtu: "{{ hostvars['proxy-jump']['ansible_default_ipv4']['mtu'] }}"
     interface_interfaces: '
     {%- import "roles/common/templates/network.j2" as network with context -%}
     {%- set variables = namespace(
