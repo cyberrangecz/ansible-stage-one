@@ -396,6 +396,7 @@
 
       - name: reboot machine
         win_reboot:
+          reboot_timeout: 900
         when: win_hostname_return_value.reboot_required
 
 - name: Prepare docker enabled machines
