@@ -315,40 +315,6 @@
       user_access_password: Password123
       user_access_sudo: True
 
-- name: check the connection with virtual machines through winrm protocol
-  hosts: winrm_nodes
-#  strategy: free
-  gather_facts: no
-
-  tasks:
-  - name: Wait 1600 seconds for target connection to become reachable/usable
-    wait_for_connection:
-      connect_timeout: 10
-      timeout: 1600
-
-  - name: test sandbox networking
-    win_command: 'ping {{ hostvars["man"]["default_gateway_interface_ip"] }}'
-
-  - name: ensure existence of SSH directory
-    win_file:
-      path: 'C:\Users\{{ ansible_user }}\.ssh'
-      state: directory
-
-  - name: add public key to authorized keys
-    win_copy:
-      dest: 'C:\Users\{{ ansible_user }}\.ssh\authorized_keys'
-      content: '{{ lookup("file", global_ssh_public_mgmt_key) }}'
-
-- name: Configure user access for user accessible windows hosts
-  hosts: user_accessible_nodes:&winrm_nodes
-  gather_facts: yes
-
-  roles:
-    - role: user-access-windows
-      user_access_username: user
-      user_access_password: Password123
-      user_access_admin: True
-
 - name: remove stack name prefix from hostnames of ssh nodes
   hosts:
       - management
@@ -381,23 +347,6 @@
             path: /etc/hosts
             regexp: '{{ global_sandbox_name }}-'
             replace: ''
-
-- name: remove stack name prefix from hostnames of winrm nodes
-  hosts:
-      - winrm_nodes
-  strategy: free
-  gather_facts: no
-
-  tasks:
-      - name: set a new hostname
-        win_hostname:
-            name: '{{ inventory_hostname }}'
-        register: win_hostname_return_value
-
-      - name: reboot machine
-        win_reboot:
-          reboot_timeout: 900
-        when: win_hostname_return_value.reboot_required
 
 - name: Prepare docker enabled machines
   hosts:
