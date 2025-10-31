@@ -419,10 +419,3 @@
         - ansible_os_family == 'Debian' or ansible_os_family == 'RedHat' or ansible_os_family == 'FreeBSD'
         - groups["monitor-os"] is defined and (groups["monitor-os"]|length == 0)
 
-- name: Deploy windows-exporter on all Windows hosts
-  hosts: hosts,!proxy-jump
-  roles:
-    - role: windows-exporter
-      when:
-        - ansible_os_family == "Windows"
-        - groups["monitor-os"] is defined and (groups["monitor-os"]|length == 0)
