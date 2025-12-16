@@ -3,6 +3,7 @@
       - management
       - routers
       - ssh_nodes
+      - "!windows_hosts"
   strategy: free
   gather_facts: no
 
@@ -88,7 +89,7 @@
     when: ip_forward is defined
 
 - name: Sandbox networking for netplan hosts
-  hosts: ssh_nodes,!routers
+  hosts: ssh_nodes,!routers,!windows_hosts
   strategy: free
   gather_facts: yes
   become: yes
@@ -237,6 +238,7 @@
   - management
   - routers
   - ssh_nodes
+  - "!windows_hosts"
   strategy: free
   become: yes
   become_user: root
@@ -315,7 +317,7 @@
       when: not user_access_present and not other_users_from_pool_exists
 
 - name: Configure user access for user accessible hosts
-  hosts: user_accessible_nodes:&ssh_nodes
+  hosts: user_accessible_nodes:&ssh_nodes,!windows_hosts
   strategy: free
   gather_facts: true
   become: true
@@ -327,8 +329,8 @@
       user_access_password: Password123
       user_access_sudo: True
 
-- name: check the connection with virtual machines through winrm protocol
-  hosts: winrm_nodes
+- name: check the connection with windows virtual machines
+  hosts: windows_hosts
 #  strategy: free
   gather_facts: no
 
@@ -352,7 +354,7 @@
       content: '{{ lookup("file", global_ssh_public_mgmt_key) }}'
 
 - name: Configure user access for user accessible windows hosts
-  hosts: user_accessible_nodes:&winrm_nodes
+  hosts: user_accessible_nodes:&windows_hosts
   gather_facts: yes
 
   roles:
@@ -365,6 +367,7 @@
   hosts:
       - management
       - ssh_nodes
+      - "!windows_hosts"
   strategy: free
   gather_facts: no
   become: yes
@@ -394,9 +397,9 @@
             regexp: '{{ global_sandbox_name }}-'
             replace: ''
 
-- name: remove stack name prefix from hostnames of winrm nodes
+- name: Remove stack name prefix from hostnames of windows hosts
   hosts:
-      - winrm_nodes
+      - windows_hosts
   strategy: free
   gather_facts: no
 
@@ -464,7 +467,7 @@
         (groups['monitored_hosts'] is defined and (groups['monitored_hosts']|length>0))
 
 - name: Deploy node-exporter on listed Linux hosts
-  hosts: monitor-os,!winrm_nodes
+  hosts: monitor-os,!windows_hosts
   become: yes
   roles:
     - role: node-exporter
@@ -473,7 +476,7 @@
         - groups["monitor-os"] is defined and (groups["monitor-os"]|length>0)
 
 - name: Deploy node-exporter on all Linux hosts
-  hosts: routers,hosts,!proxy-jump,!winrm_nodes
+  hosts: routers,hosts,!proxy-jump,!windows_hosts
   become: yes
   roles:
     - role: node-exporter
@@ -482,17 +485,15 @@
         - groups["monitor-os"] is defined and (groups["monitor-os"]|length == 0)
 
 - name: Deploy windows-exporter on listed Windows hosts
-  hosts: monitor-os
+  hosts: monitor-os:&windows_hosts
   roles:
     - role: windows-exporter
       when:
-        - ansible_os_family == "Windows"
         - groups["monitor-os"] is defined and (groups["monitor-os"]|length>0)
 
 - name: Deploy windows-exporter on all Windows hosts
-  hosts: hosts,!proxy-jump
+  hosts: windows_hosts
   roles:
     - role: windows-exporter
       when:
-        - ansible_os_family == "Windows"
         - groups["monitor-os"] is defined and (groups["monitor-os"]|length == 0)
