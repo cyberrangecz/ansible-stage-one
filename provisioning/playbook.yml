@@ -363,7 +363,7 @@
       user_access_password: Password123
       user_access_admin: True
 
-- name: remove stack name prefix from hostnames of ssh nodes
+- name: remove stack name prefix from hostnames of linux nodes
   hosts:
       - management
       - ssh_nodes
