@@ -207,6 +207,7 @@
       name: man-logging-forward
     vars:
       kmlf_destination: "{{ global_head_ip }}"
+      kmlf_destination_port: "{{ global_syslog_destination_port | default(515) }}"
 
 - name: Setup DROP rules on MAN
   hosts: man
