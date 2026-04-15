@@ -5,7 +5,9 @@
     run: >
         {{ (groups['monitor-os'] is defined) or
         (groups['monitor-icmp'] is defined) or
-        (groups['monitored_hosts'] is defined and (groups['monitored_hosts'] | length > 0)) }}
+        (groups['monitored_hosts_tcp'] is defined and (groups['monitored_hosts_tcp'] | length > 0)) or
+        (groups['monitored_hosts_icmp'] is defined and (groups['monitored_hosts_icmp'] | length > 0)) or
+        (monitoring_http_targets is defined and (monitoring_http_targets | length > 0)) }}
   roles:
     - role: prometheus
     - role: blackbox-exporter

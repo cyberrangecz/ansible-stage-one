@@ -1,7 +1,7 @@
 - name: blackbox-exporter
   src: https://github.com/cyberrangecz/ansible-role-blackbox-exporter.git
   scm: git
-  version: v1.0.0
+  version: v1.1.0
 - name: common
   src: https://github.com/cyberrangecz/ansible-role-common.git
   scm: git
@@ -37,7 +37,7 @@
 - name: prometheus
   src: https://github.com/cyberrangecz/ansible-role-prometheus.git
   scm: git
-  version: v1.0.1
+  version: v2.0.0
 - name: user-access
   src: https://github.com/cyberrangecz/ansible-role-user-access.git
   scm: git
