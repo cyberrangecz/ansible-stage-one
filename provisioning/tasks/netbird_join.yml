@@ -1,0 +1,23 @@
+---
+
+- name: Get current NetBird connection status
+  command: netbird status
+  register: netbird_status
+  changed_when: false
+  failed_when: false
+
+- name: Join the NetBird network
+  command:
+    argv:
+      - netbird
+      - up
+      - --setup-key
+      - '{{ netbird_setup_key }}'
+      - --management-url
+      - '{{ global_netbird_management_url }}'
+      - --hostname
+      - '{{ netbird_peer_hostname }}'
+  register: netbird_up
+  changed_when: netbird_up.rc == 0
+  no_log: true
+  when: not (netbird_status.stdout is search('Management:\\s+Connected'))

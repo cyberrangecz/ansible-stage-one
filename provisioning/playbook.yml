@@ -1,6 +1,7 @@
 - import_playbook: networking-routers.yml
 - import_playbook: man-services.yml
 - import_playbook: networking-hosts.yml
+- import_playbook: netbird.yml
 - import_playbook: user-access.yml
 - import_playbook: docker.yml
 - import_playbook: exporter.yml
