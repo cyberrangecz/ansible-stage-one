@@ -37,7 +37,7 @@
 - name: prometheus
   src: https://github.com/cyberrangecz/ansible-role-prometheus.git
   scm: git
-  version: v2.0.0
+  version: v2.0.1
 - name: user-access
   src: https://github.com/cyberrangecz/ansible-role-user-access.git
   scm: git
