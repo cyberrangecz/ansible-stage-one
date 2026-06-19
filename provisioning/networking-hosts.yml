@@ -1,6 +1,7 @@
 - name: Sandbox networking for netplan hosts
   hosts: ssh_nodes:!routers:!windows_hosts
   become: true
+
   tasks:
     - name: Skip for non-netplan hosts
       ansible.builtin.meta: end_host
@@ -9,7 +10,23 @@
     - name: Get user network interface
       set_fact:
         user_network_interface: "{{ ansible_interfaces | map('regex_replace', '^', 'ansible_') | map('extract', vars) | selectattr('ipv4.address', 'defined') | selectattr('ipv4.address', 'eq', user_network_ip) | map(attribute='device') | first }}"
-
+        management_interface: >-
+          {{
+            ansible_interfaces
+            | map('regex_replace', '^', 'ansible_')
+            | map('extract', vars)
+            | selectattr('ipv4.address', 'defined')
+            | selectattr('ipv4.address', 'equalto', ansible_host)
+            | map(attribute='device')
+            | first
+            | default('')
+          }}
+          
+    - name: Check management interface
+      fail:
+        msg: "backend-sandbox-service: cannot determine management interface"
+      when: management_interface == ''
+          
     - name: Create Netplan configuration file
       copy:
         content: |
@@ -17,23 +34,29 @@
           network:
             version: 2
             ethernets:
-              {% for interface in ansible_interfaces | reject('equalto', 'lo') | sort %}
-              {{ interface }}:
+              {% set interfaces_sorted = ansible_interfaces | reject('equalto', 'lo') | sort %}
+              {% set ns = namespace(metric=200) %}
+    
+              {% for iface in interfaces_sorted %}
+              {{ iface }}:
                 dhcp4: true
                 dhcp4-overrides:
-                  route-metric: {{ 100 if interface == user_network_interface else 200 }}
+                  route-metric: {{ 100 if iface == management_interface else ns.metric }}
                 dhcp6: false
+              {% if iface != management_interface %}
+              {% set ns.metric = ns.metric + 100 %}
+              {% endif %}
               {% endfor %}
         dest: /etc/netplan/50-cloud-init.yaml
         owner: root
         group: root
         mode: '0600'
       register: netplan_config
-
+     
     - name: Apply Netplan
       command: netplan apply
       when: netplan_config is changed
-
+          
 - name: Test sandbox networking
   hosts: ssh_nodes:!routers:!windows_hosts
   tasks:
@@ -63,6 +86,49 @@
 
   - name: Gather facts
     setup:
+
+  - name: Configure Windows interface metrics
+    win_shell: |
+      $ManagementIP = "{{ ansible_host }}"
+      $UserIP = "{{ user_network_ip }}"
+  
+      $ManagementIfIndex = (
+        Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object IPAddress -eq $ManagementIP |
+        Select-Object -First 1
+      ).InterfaceIndex
+  
+      if (-not $ManagementIfIndex) {
+        throw "Cannot determine management interface for IP $ManagementIP"
+      }
+  
+      # Only sandbox-related interfaces (management + user network)
+      $SandboxIfIndexes = (
+        Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object {
+          $_.IPAddress -eq $ManagementIP -or
+          $_.IPAddress -eq $UserIP
+        } |
+        Select-Object -ExpandProperty InterfaceIndex -Unique
+      )
+  
+      foreach ($IfIndex in $SandboxIfIndexes) {
+  
+        $DesiredMetric = if ($IfIndex -eq $ManagementIfIndex) { 100 } else { 200 }
+  
+        $Current = Get-NetIPInterface -InterfaceIndex $IfIndex -AddressFamily IPv4
+  
+        if (
+          $Current.InterfaceMetric -ne $DesiredMetric -or
+          $Current.AutomaticMetric -eq "Enabled"
+        ) {
+          Set-NetIPInterface `
+            -InterfaceIndex $IfIndex `
+            -AddressFamily IPv4 `
+            -AutomaticMetric Disabled `
+            -InterfaceMetric $DesiredMetric
+        }
+      }
 
   - name: test sandbox networking
     win_command: 'ping {{ hostvars["man"]["default_gateway_interface_ip"] }}'

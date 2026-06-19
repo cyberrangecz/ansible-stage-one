@@ -35,23 +35,35 @@
       msg: "Network unavailable, using existing package cache"
     when: network_test is failed
 
+
 - name: Sandbox networking
   hosts: man:routers
   become: true
+  gather_facts: false
   strategy: host_pinned
   pre_tasks:
+  
+  - name: Ensure all interfaces have IP address assigned
+    ansible.builtin.setup:
+    failed_when: "ansible_interfaces | map('regex_replace', '^', 'ansible_') | map('extract', vars) | rejectattr('ipv4', 'defined') | rejectattr('ipv6', 'defined') | length > 0"
+    retries: 40
+    delay: 5
+
+  - name: Gather facts after network stabilization
+    ansible.builtin.setup:
+    
   - name: Get systemd-resolved status (using command)
     command: resolvectl status
     register: resolved_status
     changed_when: false
     check_mode: false
     failed_when: false
-
+  
   - name: Extract DNS Servers (using regex - handles global and per-link)
     set_fact:
       resolved_upstream_dns: "{{ resolved_status.stdout | regex_findall('DNS Servers: (.*)') | map('trim') | join(' ') | split() }}"
     when: resolved_status.rc == 0
-
+ 
   roles:
   - role: interface
     interface_mtu: "{{ hostvars['proxy-jump']['ansible_default_ipv4']['mtu'] }}"
