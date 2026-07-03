@@ -1,0 +1,31 @@
+---
+- name: Enable IP forwarding (Linux)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Check whether the NetBird agent is already installed
+  command: netbird version
+  register: netbird_version
+  changed_when: false
+  failed_when: false
+
+- name: Install NetBird via official installer (Linux)
+  shell:
+    cmd: set -o pipefail && curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    executable: /bin/bash
+  environment:
+    NETBIRD_SKIP_UI_INSTALL: 'true'
+  when: netbird_version.rc != 0
+
+- name: Ensure the NetBird service is enabled and running (Linux)
+  systemd:
+    name: netbird
+    enabled: true
+    state: started
+
+- name: Join the NetBird network
+  include_tasks: join.yml

@@ -1,0 +1,4 @@
+---
+# Source network for the OPNsense wt0 "pass in" rule. wt0 is the trust boundary,
+# so 'any' is safe; override to narrow it (e.g. the NetBird CIDR).
+netbird_opnsense_fw_source: any

@@ -1,0 +1,140 @@
+---
+# OPNsense / FreeBSD entrypoint.
+#
+# Uses the official OPNsense "os-netbird" plugin rather than the raw netbird
+# package: it registers the wt0 tunnel as an OPNsense device so OPNsense pf can
+# filter it.
+#
+# NetBird runs as a userspace WireGuard routing peer here. Per netbird issue
+# #5327, its userspace firewall drops inbound packets before the kernel and its
+# masquerade does not rewrite source IPs. So we DISABLE NetBird's firewall
+# management (firewall.allowConfig = 0) and let OPNsense pf govern wt0.
+
+- name: Install the NetBird OPNsense plugin (os-netbird)
+  command: pkg install -y os-netbird
+  register: netbird_pkg_install
+  changed_when: "'already installed' not in netbird_pkg_install.stdout"
+
+# No configctl/CLI exists to toggle a plugin model value, so drive the plugin's
+# own model classes (the same path its API controllers use) and persist to
+# config.xml:
+#   general.enable       = 1  -> plugin manages the netbird service
+#   firewall.allowConfig = 0  -> NetBird does NOT manage pf (issue #5327);
+#                                OPNsense pf governs wt0 instead.
+#   dns.enable           = 0  -> NetBird does NOT manage DNS
+# These values only reach NetBird's runtime config.json after the sync-config
+# step below.
+- name: Configure the NetBird plugin in the OPNsense configuration
+  shell:
+    cmd: |
+      /usr/local/bin/php -r '
+        require_once("config.inc");
+        $s = new \OPNsense\Netbird\Settings();
+        $changed = false;
+        if ((string)$s->general->enable !== "1") { $s->general->enable = "1"; $changed = true; }
+        if ((string)$s->firewall->allowConfig !== "0") { $s->firewall->allowConfig = "0"; $changed = true; }
+        if ((string)$s->dns->enable !== "0") { $s->dns->enable = "0"; $changed = true; }
+        if (!$changed) { echo "unchanged"; exit(0); }
+        $s->serializeToConfig();
+        \OPNsense\Core\Config::getInstance()->save();
+        echo "changed";
+      '
+  register: netbird_enable_cfg
+  changed_when: "'changed' in netbird_enable_cfg.stdout and 'unchanged' not in netbird_enable_cfg.stdout"
+
+- name: Render the NetBird service template into rc.conf.d (FreeBSD)
+  command: configctl template reload OPNsense/Netbird
+  when: netbird_enable_cfg is changed
+  changed_when: true
+
+# The daemon must run once before /var/db/netbird/config.json exists; only then
+# can sync-config write our plugin settings into it.
+- name: Ensure the NetBird daemon is running (FreeBSD)
+  command: configctl netbird start
+  changed_when: false
+
+- name: Wait for the NetBird runtime config to exist (FreeBSD)
+  wait_for:
+    path: /var/db/netbird/config.json
+    timeout: 30
+
+- name: Sync plugin settings into the NetBird runtime config (FreeBSD)
+  command: configctl netbird sync-config
+  changed_when: false
+
+- name: Confirm NetBird's firewall management is disabled (FreeBSD)
+  shell: |
+    grep -q '"DisableFirewall": true' /var/db/netbird/config.json
+  changed_when: false
+
+- name: Restart the NetBird daemon to apply the synced config (FreeBSD)
+  command: configctl netbird restart
+  when: netbird_enable_cfg is changed
+  changed_when: true
+
+# Must run before the wt0 assignment below: netbird up brings the tunnel up and
+# puts the peer address on wt0, which the interface assignment then (deliberately)
+# strips and the final restart re-applies.
+- name: Join the NetBird network (FreeBSD)
+  include_tasks: join.yml
+
+# NetBird's userspace firewall/masquerade does not work on FreeBSD (issue #5327),
+# so OPNsense must filter wt0 itself. wt0 has to be an assigned interface before a
+# rule can target it; the helper assigns it and adds a single "pass in" rule,
+# both idempotently.
+- name: Stage the wt0 firewall helper (FreeBSD)
+  copy:
+    src: netbird_opnsense_firewall.php
+    dest: /tmp/netbird_opnsense_firewall.php
+    owner: root
+    group: wheel
+    mode: '0600'
+
+- name: Assign wt0 and add its OPNsense pass rule
+  command:
+    argv:
+      - /usr/local/bin/php
+      - /tmp/netbird_opnsense_firewall.php
+      - wt0
+      - NETBIRD
+      - "{{ netbird_opnsense_fw_source | default('any') }}"
+      - netbird-wt0-allow (managed by ansible)
+  register: netbird_fw
+  changed_when: netbird_fw.stdout is search('^changed ')
+
+- name: Resolve the assigned wt0 interface id
+  set_fact:
+    netbird_wt0_ifid: "{{ netbird_fw.stdout.split() | last }}"
+
+- name: Apply the new interface assignment (FreeBSD)
+  command: "configctl interface reconfigure {{ netbird_wt0_ifid }}"
+  when: netbird_fw is changed
+  changed_when: true
+
+- name: Reload the OPNsense firewall (FreeBSD)
+  command: configctl filter reload
+  when: netbird_fw is changed
+  changed_when: true
+
+# Assigning/reconfiguring wt0 as an OPNsense interface (ipaddr=none) strips the
+# address NetBird put on the tunnel. Restart NetBird last so the daemon re-applies
+# its address; without this wt0 is left with only a link-local address and nothing
+# routes.
+- name: Re-apply the NetBird tunnel address after interface changes (FreeBSD)
+  command: configctl netbird restart
+  when: netbird_fw is changed
+  changed_when: true
+
+- name: Wait for the NetBird tunnel to regain its IPv4 address (FreeBSD)
+  command: ifconfig wt0
+  register: netbird_wt0_ifconfig
+  until: netbird_wt0_ifconfig.stdout is search('inet ')
+  retries: 10
+  delay: 3
+  changed_when: false
+  when: netbird_fw is changed
+
+- name: Remove the wt0 firewall helper (FreeBSD)
+  file:
+    path: /tmp/netbird_opnsense_firewall.php
+    state: absent
