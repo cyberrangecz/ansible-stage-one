@@ -7,15 +7,17 @@
 
 - name: Extract the management server host from the URL
   set_fact:
-    netbird_mgmt_host: "{{ global_netbird_management_url
-                           | regex_replace('^[a-zA-Z][a-zA-Z0-9+.-]*://', '')
-                           | regex_replace('[:/].*$', '') }}"
+    netbird_mgmt_host: >-
+      {{ global_netbird_management_url
+      | regex_replace('^[a-zA-Z][a-zA-Z0-9+.-]*://', '')
+      | regex_replace('[:/].*$', '') }}
 
 - name: Determine the MAN router IP on the management network
   set_fact:
-    netbird_man_gw: "{{ ansible_all_ipv4_addresses
-                        | ansible.utils.ipaddr(global_sandbox_man_cidr)
-                        | first | default('', true) }}"
+    netbird_man_gw: >-
+      {{ ansible_all_ipv4_addresses
+      | ansible.utils.ipaddr(global_sandbox_man_cidr)
+      | first | default('', true) }}
 
 - name: Fail if no MAN router IP was found on the management network
   fail:
@@ -31,6 +33,7 @@
 
 - name: Build the list of management IPs to route
   set_fact:
-    netbird_mgmt_ips: "{{ netbird_mgmt_getent.stdout_lines
-                          | map('regex_replace', '\\s.*$', '')
-                          | unique | list }}"
+    netbird_mgmt_ips: >-
+      {{ netbird_mgmt_getent.stdout_lines
+      | map('regex_replace', '\s.*$', '')
+      | unique | list }}

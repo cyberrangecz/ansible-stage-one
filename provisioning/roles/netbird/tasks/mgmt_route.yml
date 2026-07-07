@@ -14,7 +14,10 @@
 
 - name: Determine whether this host is a supported netplan Linux host
   set_fact:
-    netbird_is_netplan: "{{ ansible_distribution == 'Ubuntu' or (ansible_distribution == 'Debian' and ansible_distribution_version is version('12', '>=')) }}"
+    netbird_is_netplan: >-
+      {{ ansible_distribution == 'Ubuntu'
+      or (ansible_distribution == 'Debian'
+      and ansible_distribution_version is version('12', '>=')) }}
 
 - name: Pin the management route via netplan (Linux)
   when: netbird_is_netplan
