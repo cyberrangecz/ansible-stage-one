@@ -8,14 +8,10 @@
 
 - name: Join the NetBird network
   command:
-    argv:
-      - netbird
-      - up
-      - --setup-key
-      - '{{ netbird_setup_key }}'
-      - --management-url
-      - '{{ global_netbird_management_url }}'
-      - --hostname
-      - '{{ netbird_peer_hostname }}'
+    cmd: >
+      netbird up
+      --setup-key '{{ netbird_setup_key }}'
+      --management-url '{{ global_netbird_management_url }}'
+      --hostname '{{ netbird_peer_hostname }}'
   no_log: true
   when: not (netbird_status.stdout is search('Management:\\s+Connected'))
