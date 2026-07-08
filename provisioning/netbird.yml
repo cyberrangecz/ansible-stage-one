@@ -11,16 +11,6 @@
         tasks_from: discover.yml
       when: groups['vpn_entrypoints'] | default([]) | length > 0
 
-- name: Pin a persistent route to the NetBird management server over the management network
-  hosts: vpn_entrypoints:!windows_hosts
-  become: true
-  gather_facts: true
-  tasks:
-    - name: Pin the NetBird management route
-      import_role:
-        name: netbird
-        tasks_from: mgmt_route.yml
-
 - name: Configure NetBird VPN entrypoints
   hosts: vpn_entrypoints:!windows_hosts
   gather_facts: true

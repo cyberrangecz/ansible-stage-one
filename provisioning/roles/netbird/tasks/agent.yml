@@ -24,6 +24,15 @@
       | regex_replace('(?<=-p)0+(?=[0-9])', '')
       | regex_replace('(?<=-s)0+(?=[0-9])', '')) ~ '-' ~ inventory_hostname }}
 
+- name: Ensure the MAN discovery facts are available
+  assert:
+    that:
+      - hostvars['man'].netbird_mgmt_ips is defined
+      - hostvars['man'].netbird_man_gw is defined
+    fail_msg: >-
+      NetBird MAN facts are missing. The MAN discovery play must run before the
+      entrypoints (do not --limit it out of the run).
+
 - name: Configure the NetBird agent (Linux)
   when: ansible_system == 'Linux'
   become: true

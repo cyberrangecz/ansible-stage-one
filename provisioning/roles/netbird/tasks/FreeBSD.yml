@@ -10,6 +10,26 @@
 # masquerade does not rewrite source IPs. So we DISABLE NetBird's firewall
 # management (firewall.allowConfig = 0) and let OPNsense pf govern wt0.
 
+- name: Write an rc.conf.d drop-in pinning the management route via the MAN router
+  copy:
+    dest: /etc/rc.conf.d/routing
+    owner: root
+    group: wheel
+    mode: '0644'
+    content: |
+      #jinja2: trim_blocks: True, lstrip_blocks: True
+      static_routes="{% for ip in hostvars['man'].netbird_mgmt_ips %}nbmgmt{{ loop.index0 }} {% endfor %}"
+      {% for ip in hostvars['man'].netbird_mgmt_ips %}
+      route_nbmgmt{{ loop.index0 }}="-host {{ ip }} {{ hostvars['man'].netbird_man_gw }}"
+      {% endfor %}
+
+- name: Add the management routes now (FreeBSD)
+  command: "route -n add -host {{ item }} {{ hostvars['man'].netbird_man_gw }}"
+  loop: "{{ hostvars['man'].netbird_mgmt_ips }}"
+  register: netbird_route_add
+  changed_when: netbird_route_add.rc == 0
+  failed_when: netbird_route_add.rc != 0 and 'File exists' not in netbird_route_add.stderr
+
 - name: Install the NetBird OPNsense plugin (os-netbird)
   command: pkg install -y os-netbird
   register: netbird_pkg_install

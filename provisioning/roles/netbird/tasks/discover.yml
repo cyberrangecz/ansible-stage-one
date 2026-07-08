@@ -3,7 +3,7 @@
 # to the NetBird management server over the management network:
 #   netbird_man_gw   - MAN router IP on the management network (the route's gateway)
 #   netbird_mgmt_ips - resolved IPv4 address(es) of the management server
-# Consumed by mgmt_route.yml via hostvars['man'].
+# Consumed by the entrypoint agent tasks (Linux.yml/FreeBSD.yml) via hostvars['man'].
 
 - name: Extract the management server host from the URL
   set_fact:
@@ -16,12 +16,13 @@
       | ansible.utils.ipaddr(global_sandbox_man_cidr)
       | first | default('', true) }}
 
-- name: Fail if no MAN router IP was found on the management network
-  fail:
-    msg: >-
+- name: Ensure a MAN router IP was found on the management network
+  assert:
+    that:
+      - netbird_man_gw | length > 0
+    fail_msg: >-
       Could not find a MAN IP inside global_sandbox_man_cidr
       ({{ global_sandbox_man_cidr }}).
-  when: netbird_man_gw | length == 0
 
 - name: Resolve the management server to IPv4 address(es)
   command: "getent ahostsv4 {{ netbird_mgmt_host }}"
