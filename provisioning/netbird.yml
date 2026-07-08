@@ -1,0 +1,21 @@
+---
+
+- name: Discover NetBird management routing facts on MAN
+  hosts: man
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Discover NetBird management routing facts
+      import_role:
+        name: netbird
+        tasks_from: discover.yml
+      when: groups['vpn_entrypoints'] | default([]) | length > 0
+
+- name: Configure NetBird VPN entrypoints
+  hosts: vpn_entrypoints:!windows_hosts
+  gather_facts: true
+  tasks:
+    - name: Configure the NetBird agent
+      import_role:
+        name: netbird
+        tasks_from: agent.yml

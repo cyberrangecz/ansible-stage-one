@@ -1,0 +1,75 @@
+---
+- name: Enable IP forwarding (Linux)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    state: present
+    reload: true
+
+# Pin a persistent route to the NetBird management server via the MAN router so
+# management traffic uses the management network rather than the tunnel. Applied
+# before joining so the route is in place before the tunnel comes up.
+- name: Find the management-network interface
+  set_fact:
+    netbird_mgmt_iface: "{{ item.device }}"
+  loop: "{{ ansible_interfaces | map('regex_replace', '^', 'ansible_') | map('extract', vars) | selectattr('ipv4.address', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.device }}"
+  when:
+    - netbird_mgmt_iface is not defined
+    - (item.ipv4.address | ansible.utils.ipaddr(global_sandbox_man_cidr)) | default('', true) | length > 0
+
+- name: Ensure a management-network interface was found
+  assert:
+    that:
+      - netbird_mgmt_iface is defined
+    fail_msg: >-
+      Could not find the management-network interface.
+
+- name: Write a netplan drop-in pinning the management route via the MAN router
+  copy:
+    dest: /etc/netplan/60-netbird-mgmt-route.yaml
+    owner: root
+    group: root
+    mode: '0600'
+    content: |
+      #jinja2: trim_blocks: True, lstrip_blocks: True
+      network:
+        version: 2
+        ethernets:
+          {{ netbird_mgmt_iface }}:
+            routes:
+            {% for ip in hostvars['man'].netbird_mgmt_ips %}
+              - to: {{ ip }}/32
+                via: {{ hostvars['man'].netbird_man_gw }}
+            {% endfor %}
+  register: netbird_mgmt_netplan
+
+- name: Apply the netplan management route (Linux)
+  command: netplan apply
+  when: netbird_mgmt_netplan is changed
+  changed_when: true
+
+- name: Check whether the NetBird agent is already installed
+  command: netbird version
+  register: netbird_version
+  changed_when: false
+  failed_when: false
+
+- name: Install NetBird via official installer (Linux)
+  shell:
+    cmd: set -o pipefail && curl -fsSL https://pkgs.netbird.io/install.sh | sh
+    executable: /bin/bash
+  environment:
+    NETBIRD_SKIP_UI_INSTALL: 'true'
+  when: netbird_version.rc != 0
+
+- name: Ensure the NetBird service is enabled and running (Linux)
+  systemd:
+    name: netbird
+    enabled: true
+    state: started
+
+- name: Join the NetBird network
+  include_tasks: join.yml

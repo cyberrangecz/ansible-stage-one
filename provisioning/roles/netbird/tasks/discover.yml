@@ -1,0 +1,37 @@
+---
+# Runs on the MAN host. Discovers the facts the entrypoints need to pin a route
+# to the NetBird management server over the management network:
+#   netbird_man_gw   - MAN router IP on the management network (the route's gateway)
+#   netbird_mgmt_ips - resolved IPv4 address(es) of the management server
+# Consumed by the entrypoint agent tasks (Linux.yml/FreeBSD.yml) via hostvars['man'].
+
+- name: Extract the management server host from the URL
+  set_fact:
+    netbird_mgmt_host: "{{ global_netbird_management_url | ansible.builtin.urlsplit('hostname') }}"
+
+- name: Determine the MAN router IP on the management network
+  set_fact:
+    netbird_man_gw: >-
+      {{ ansible_all_ipv4_addresses
+      | ansible.utils.ipaddr(global_sandbox_man_cidr)
+      | first | default('', true) }}
+
+- name: Ensure a MAN router IP was found on the management network
+  assert:
+    that:
+      - netbird_man_gw | length > 0
+    fail_msg: >-
+      Could not find a MAN IP inside global_sandbox_man_cidr
+      ({{ global_sandbox_man_cidr }}).
+
+- name: Resolve the management server to IPv4 address(es)
+  command: "getent ahostsv4 {{ netbird_mgmt_host }}"
+  register: netbird_mgmt_getent
+  changed_when: false
+
+- name: Build the list of management IPs to route
+  set_fact:
+    netbird_mgmt_ips: >-
+      {{ netbird_mgmt_getent.stdout_lines
+      | map('regex_replace', '\s.*$', '')
+      | unique | list }}
