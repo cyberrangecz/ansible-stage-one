@@ -10,6 +10,19 @@
       set_fact:
         user_network_interface: "{{ ansible_interfaces | map('regex_replace', '^', 'ansible_') | map('extract', vars) | selectattr('ipv4.address', 'defined') | selectattr('ipv4.address', 'eq', user_network_ip) | map(attribute='device') | first }}"
 
+    # A network_forwarding destination receives the mirrored traffic through the per-sandbox
+    # router that exposes it on a floating IP. Its default route points at the topology
+    # router on another interface, so without a route back over the destination interface the
+    # replies leave un-NATed through the wrong gateway. Only set on the destination host, and
+    # only on OpenStack: the inventory carries forwarding_router_ip nowhere else.
+    - name: Get network forwarding destination interface
+      set_fact:
+        forwarding_destination_interface: "{{ ansible_interfaces | map('regex_replace', '^', 'ansible_') | map('extract', vars) | selectattr('macaddress', 'defined') | selectattr('macaddress', 'eq', forwarding_destination_mac | lower) | map(attribute='device') | first }}"
+      when:
+        - forwarding_router_ip | default('', true) | length > 0
+        - forwarding_destination_mac | default('', true) | length > 0
+        - global_hypervisor_cidr | default('', true) | length > 0
+
     - name: Create Netplan configuration file
       copy:
         content: |
@@ -23,6 +36,11 @@
                 dhcp4-overrides:
                   route-metric: {{ 100 if interface == user_network_interface else 200 }}
                 dhcp6: false
+                {% if interface == forwarding_destination_interface | default('') %}
+                routes:
+                  - to: {{ global_hypervisor_cidr }}
+                    via: {{ forwarding_router_ip }}
+                {% endif %}
               {% endfor %}
         dest: /etc/netplan/50-cloud-init.yaml
         owner: root
