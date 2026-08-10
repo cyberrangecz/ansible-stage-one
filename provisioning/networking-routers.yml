@@ -40,6 +40,12 @@
   become: true
   strategy: host_pinned
   pre_tasks:
+  - name: Ensure all interfaces have IP address assigned
+    ansible.builtin.setup:
+    failed_when: "ansible_interfaces | map('regex_replace', '^', 'ansible_') | map('extract', vars) | rejectattr('ipv4', 'defined') | rejectattr('ipv6', 'defined') | length > 0"
+    retries: 40
+    delay: 5
+
   - name: Get systemd-resolved status (using command)
     command: resolvectl status
     register: resolved_status
