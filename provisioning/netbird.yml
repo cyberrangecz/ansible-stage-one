@@ -12,7 +12,7 @@
       when: groups['vpn_entrypoints'] | default([]) | length > 0
 
 - name: Configure NetBird VPN entrypoints
-  hosts: vpn_entrypoints:!windows_hosts
+  hosts: vpn_entrypoints:!windows_hosts:!unmanaged_hosts
   gather_facts: true
   tasks:
     - name: Configure the NetBird agent
