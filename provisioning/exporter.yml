@@ -13,7 +13,7 @@
     - role: blackbox-exporter
 
 - name: Deploy node-exporter on Linux hosts
-  hosts: "{{ 'monitor-os:!windows_hosts' if run_listed else 'routers:hosts:!proxy-jump:!windows_hosts' if run_all else omit }}"
+  hosts: "{{ 'monitor-os:!windows_hosts:!unmanaged_hosts' if run_listed else 'routers:hosts:!proxy-jump:!windows_hosts:!unmanaged_hosts' if run_all else omit }}"
   become: true
   strategy: host_pinned
   vars:
@@ -24,7 +24,7 @@
       when: ansible_os_family == 'Debian' or ansible_os_family == 'RedHat' or ansible_os_family == 'FreeBSD'
 
 - name: Deploy windows-exporter on Windows hosts
-  hosts: "{{ 'monitor-os:&windows_hosts' if run_listed else 'windows_hosts' if run_all else omit }}"
+  hosts: "{{ 'monitor-os:&windows_hosts:!unmanaged_hosts' if run_listed else 'windows_hosts:!unmanaged_hosts' if run_all else omit }}"
   vars:
     run_listed: "{{ groups['monitor-os'] is defined and (groups['monitor-os'] | length > 0) }}"
     run_all: "{{ groups['monitor-os'] is defined and (groups['monitor-os'] | length == 0) }}"

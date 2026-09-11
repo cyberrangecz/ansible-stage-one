@@ -1,5 +1,7 @@
+# unmanaged_hosts are appliances the platform must not configure (e.g. images without
+# cloud-init, reached later by user-ansible); every node play excludes them.
 - name: Sandbox networking for netplan hosts
-  hosts: ssh_nodes:!routers:!windows_hosts
+  hosts: ssh_nodes:!routers:!windows_hosts:!unmanaged_hosts
   become: true
   tasks:
     - name: Skip for non-netplan hosts
@@ -53,7 +55,7 @@
       when: netplan_config is changed
 
 - name: Test sandbox networking
-  hosts: ssh_nodes:!routers:!windows_hosts
+  hosts: ssh_nodes:!routers:!windows_hosts:!unmanaged_hosts
   tasks:
   - command: 'ping -c 3 {{ hostvars["man"]["default_gateway_interface_ip"] }}'
     changed_when: false
@@ -63,7 +65,7 @@
     delay: 10
 
 - name: remove stack name prefix from hostnames of linux hosts
-  hosts: ssh_nodes:!routers:!windows_hosts
+  hosts: ssh_nodes:!routers:!windows_hosts:!unmanaged_hosts
   become: true
   tasks:
     - name: set a new hostname
@@ -71,7 +73,7 @@
         name: '{{ inventory_hostname }}'
 
 - name: check the connection with windows virtual machines
-  hosts: windows_hosts
+  hosts: windows_hosts:!unmanaged_hosts
   gather_facts: false
   tasks:
   - name: Wait 1600 seconds for target connection to become reachable/usable
@@ -87,7 +89,7 @@
     changed_when: false
 
 - name: Remove stack name prefix from hostnames of windows hosts
-  hosts: windows_hosts
+  hosts: windows_hosts:!unmanaged_hosts
   tasks:
   - name: set a new hostname
     win_hostname:
