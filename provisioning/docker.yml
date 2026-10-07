@@ -1,5 +1,5 @@
 - name: Prepare docker enabled machines
-  hosts: docker_hosts
+  hosts: docker_hosts:!unmanaged_hosts
   become: true
   roles:
     - role: user-access
